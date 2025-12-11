@@ -1,7 +1,15 @@
+// Set global compileSdk for all subprojects to fix package_info_plus issue
+ext {
+    compileSdkVersion = 34
+    compileSdk = 34
+}
+
 allprojects {
     repositories {
         google()
         mavenCentral()
+        // FFmpeg Kit repository
+        maven { url 'https://jitpack.io' }
     }
 }
 

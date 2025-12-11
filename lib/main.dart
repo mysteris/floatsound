@@ -4,11 +4,11 @@ import 'services/audio_player_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize audio player service
   final audioPlayerService = AudioPlayerService();
   await audioPlayerService.init();
-  
+
   runApp(const MyApp());
 }
 

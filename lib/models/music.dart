@@ -72,12 +72,12 @@ class Music {
       year: map['year'] ?? 0,
     );
   }
-  
+
   // JSON serialization for shared_preferences
   Map<String, dynamic> toJson() {
     return toMap();
   }
-  
+
   factory Music.fromJson(Map<String, dynamic> json) {
     return Music.fromMap(json);
   }

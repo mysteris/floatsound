@@ -16,8 +16,8 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   final List<Widget> _pages = [
-    LibraryScreen(), // Filter page with categories
-    CategoryScreen(), // Songs list page
+    const LibraryScreen(), // Filter page with categories
+    const CategoryScreen(), // Songs list page
     const MyPage(), // My page with settings, equalizer, about
   ];
 

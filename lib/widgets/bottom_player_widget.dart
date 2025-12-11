@@ -38,20 +38,22 @@ class BottomPlayerWidget extends StatelessWidget {
                       // Album cover thumbnail
                       Padding(
                         padding: const EdgeInsets.only(left: 10.0),
-                        child: audioPlayerService.currentMusic?.coverPath != null
-                            ? Image.file(
-                                File(audioPlayerService.currentMusic!.coverPath!),
-                                width: 40,
-                                height: 40,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                width: 40,
-                                height: 40,
-                                color: Colors.grey[800],
-                                child: const Icon(Icons.music_note,
-                                    color: Colors.white, size: 20),
-                              ),
+                        child:
+                            audioPlayerService.currentMusic?.coverPath != null
+                                ? Image.file(
+                                    File(audioPlayerService
+                                        .currentMusic!.coverPath!),
+                                    width: 40,
+                                    height: 40,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Container(
+                                    width: 40,
+                                    height: 40,
+                                    color: Colors.grey[800],
+                                    child: const Icon(Icons.music_note,
+                                        color: Colors.white, size: 20),
+                                  ),
                       ),
                       const SizedBox(width: 10),
                       // Song title and artist with width limit

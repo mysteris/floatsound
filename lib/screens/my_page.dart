@@ -34,7 +34,7 @@ class MyPage extends StatelessWidget {
       ),
     );
   }
-  
+
   // Build my item
   Widget _buildMyItem(IconData icon, String title) {
     return SizedBox(

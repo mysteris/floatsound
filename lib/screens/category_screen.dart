@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_state.dart';
+import '../models/music.dart';
 import '../services/audio_player_service.dart';
 import 'player_screen.dart';
 import 'tag_editor_screen.dart';
@@ -9,10 +10,32 @@ import 'tag_editor_screen.dart';
 class CategoryScreen extends StatelessWidget {
   const CategoryScreen({super.key});
 
+  // Play music with error handling
+  void _playMusic(BuildContext context, AudioPlayerService audioPlayerService,
+      List<Music> musicList, int index) async {
+    try {
+      await audioPlayerService.setPlaylist(musicList, startIndex: index);
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PlayerScreen()),
+      );
+    } catch (e) {
+      print('Playback error: $e');
+      // Show error message to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('DSF和APE格式暂不支持播放，建议转换为FLAC或WAV格式'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final audioPlayerService = AudioPlayerService();
-    
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -34,20 +57,20 @@ class CategoryScreen extends StatelessWidget {
       body: Consumer<AppState>(
         builder: (context, appState, child) {
           final filteredMusicList = appState.filteredMusicList;
-          
+
           if (filteredMusicList.isEmpty) {
-            return Center(
+            return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.music_off, size: 60, color: Colors.grey),
-                  const SizedBox(height: 20),
-                  const Text(
+                  Icon(Icons.music_off, size: 60, color: Colors.grey),
+                  SizedBox(height: 20),
+                  Text(
                     '没有找到音乐',
                     style: TextStyle(color: Colors.grey, fontSize: 18),
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
+                  SizedBox(height: 10),
+                  Text(
                     '请选择音乐目录开始扫描',
                     style: TextStyle(color: Colors.grey, fontSize: 18),
                   ),
@@ -55,7 +78,7 @@ class CategoryScreen extends StatelessWidget {
               ),
             );
           }
-          
+
           return ListView.builder(
             itemCount: filteredMusicList.length,
             itemBuilder: (context, index) {
@@ -79,22 +102,16 @@ class CategoryScreen extends StatelessWidget {
                 ),
                 trailing: IconButton(
                   onPressed: () {
-                    // Play music
-                    audioPlayerService.setPlaylist(filteredMusicList, startIndex: index);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => PlayerScreen()),
-                    );
+                    // Play music with error handling
+                    _playMusic(
+                        context, audioPlayerService, filteredMusicList, index);
                   },
                   icon: const Icon(Icons.play_arrow, color: Colors.red),
                 ),
                 onTap: () {
-                  // Play music
-                  audioPlayerService.setPlaylist(filteredMusicList, startIndex: index);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => PlayerScreen()),
-                  );
+                  // Play music with error handling
+                  _playMusic(
+                      context, audioPlayerService, filteredMusicList, index);
                 },
               );
             },

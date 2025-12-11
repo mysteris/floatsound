@@ -11,8 +11,18 @@ class FileScannerService {
 
   // Supported audio formats
   final List<String> _supportedFormats = [
-    '.wav', '.flac', '.aiff', '.aif', '.mp3', '.m4a', '.ogg', '.opus',
-    '.ape', '.dsf', '.dff' // Added HIFI formats
+    '.wav',
+    '.flac',
+    '.aiff',
+    '.aif',
+    '.mp3',
+    '.m4a',
+    '.ogg',
+    '.opus',
+    '.wma',
+    '.ape',
+    '.dsf',
+    '.dff'
   ];
 
   // Scan directory for music files
