@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 import '../services/audio_player_service.dart';
 import '../screens/player_screen.dart';
 
@@ -11,11 +10,9 @@ class BottomPlayerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final audioPlayerService = AudioPlayerService();
 
-    return StreamBuilder<PlayerState>(
-      stream: audioPlayerService.playerStateStream,
-      builder: (context, playerStateSnapshot) {
-        final isPlaying = playerStateSnapshot.data?.playing ?? false;
-
+    return ValueListenableBuilder<bool>(
+      valueListenable: audioPlayerService.isPlayingNotifier,
+      builder: (context, isPlaying, child) {
         return Container(
           height: 60,
           color: Colors.grey[900],

@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 import '../models/music.dart';
 import '../services/audio_player_service.dart';
 
@@ -114,7 +113,7 @@ class PlayerScreen extends StatelessWidget {
                     color: Colors.white,
                   ),
                   Text(
-                    'AUDIOTRACK OUTPUT 32 BIT 48 KHZ',
+                    'FFMPEG AUDIO 48 KHZ',
                     style: TextStyle(
                       color: Colors.grey[400],
                       fontSize: 12,
@@ -133,15 +132,12 @@ class PlayerScreen extends StatelessWidget {
             Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-              child: StreamBuilder<Duration>(
-                stream: _audioPlayerService.positionStream,
-                builder: (context, positionSnapshot) {
-                  return StreamBuilder<Duration?>(
-                    stream: _audioPlayerService.durationStream,
-                    builder: (context, durationSnapshot) {
-                      final position = positionSnapshot.data ?? Duration.zero;
-                      final duration = durationSnapshot.data ?? Duration.zero;
-
+              child: ValueListenableBuilder<Duration>(
+                valueListenable: _audioPlayerService.positionNotifier,
+                builder: (context, position, child) {
+                  return ValueListenableBuilder<Duration>(
+                    valueListenable: _audioPlayerService.durationNotifier,
+                    builder: (context, duration, child) {
                       return Column(
                         children: [
                           Slider(
@@ -211,10 +207,9 @@ class PlayerScreen extends StatelessWidget {
                         color: Colors.red[900],
                         shape: BoxShape.circle,
                       ),
-                      child: StreamBuilder<PlayerState>(
-                        stream: _audioPlayerService.playerStateStream,
-                        builder: (context, snapshot) {
-                          final isPlaying = snapshot.data?.playing ?? false;
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: _audioPlayerService.isPlayingNotifier,
+                        builder: (context, isPlaying, child) {
                           return Icon(
                             isPlaying ? Icons.pause : Icons.play_arrow,
                             color: Colors.white,

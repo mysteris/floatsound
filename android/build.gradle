@@ -1,7 +1,7 @@
 // Set global compileSdk for all subprojects to fix package_info_plus issue
 ext {
-    compileSdkVersion = 34
-    compileSdk = 34
+    compileSdkVersion = 35
+    compileSdk = 35
 }
 
 allprojects {

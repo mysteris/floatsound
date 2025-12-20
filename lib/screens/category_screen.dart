@@ -5,7 +5,6 @@ import '../models/app_state.dart';
 import '../models/music.dart';
 import '../services/audio_player_service.dart';
 import 'player_screen.dart';
-import 'tag_editor_screen.dart';
 
 class CategoryScreen extends StatelessWidget {
   const CategoryScreen({super.key});

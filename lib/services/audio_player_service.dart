@@ -1,128 +1,309 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:ffmpeg_kit_flutter_new_audio/ffprobe_kit.dart';
 import '../models/music.dart';
 
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
 
-  AudioPlayerService._internal();
+  AudioPlayerService._internal() {
+    _initializePlayer();
+  }
 
-  final AudioPlayer _player = AudioPlayer();
+  // Initialize method for compatibility
+  Future<void> init() async {
+    await _initializePlayer();
+  }
+
+  // Flutter Sound player
+  FlutterSoundPlayer? _player;
+  
+  // Player state
   List<Music> _playlist = [];
   int _currentIndex = 0;
   bool _isPlaying = false;
-
+  bool _isPaused = false;
+  Duration _currentPosition = Duration.zero;
+  Duration _totalDuration = Duration.zero;
+  
+  // Timer for position updates
+  Timer? _positionTimer;
+  
   // ValueNotifier to notify listeners when current music changes
-  final ValueNotifier<Music?> _currentMusicNotifier =
-      ValueNotifier<Music?>(null);
+  final ValueNotifier<Music?> _currentMusicNotifier = ValueNotifier<Music?>(null);
+  final ValueNotifier<Duration> _positionNotifier = ValueNotifier<Duration>(Duration.zero);
+  final ValueNotifier<Duration> _durationNotifier = ValueNotifier<Duration>(Duration.zero);
+  final ValueNotifier<bool> _isPlayingNotifier = ValueNotifier<bool>(false);
 
-  // Getters
-  List<Music> get playlist => _playlist;
-  int get currentIndex => _currentIndex;
-  Music? get currentMusic =>
-      _playlist.isNotEmpty ? _playlist[_currentIndex] : null;
-  bool get isPlaying => _isPlaying;
+  // Getters for notifiers
   ValueNotifier<Music?> get currentMusicNotifier => _currentMusicNotifier;
+  ValueNotifier<Duration> get positionNotifier => _positionNotifier;
+  ValueNotifier<Duration> get durationNotifier => _durationNotifier;
+  ValueNotifier<bool> get isPlayingNotifier => _isPlayingNotifier;
 
-  // Initialize player
-  Future<void> init() async {
-    // Just Audio 0.9.x doesn't have AudioSource.empty()
-    // Initialize player without audio source
-    _player.playerStateStream.listen((state) {
-      _isPlaying = state.playing;
-    });
-  }
+  // Getters for current state
+  Music? get currentMusic => _currentMusicNotifier.value;
+  Duration get currentPosition => _currentPosition;
+  Duration get totalDuration => _totalDuration;
+  bool get isPlaying => _isPlaying;
+  bool get isPaused => _isPaused;
+  List<Music> get playlist => List.unmodifiable(_playlist);
+  int get currentIndex => _currentIndex;
 
-  // Set playlist and play
-  Future<void> setPlaylist(List<Music> playlist, {int startIndex = 0}) async {
-    _playlist = playlist;
-    _currentIndex = startIndex;
-    await _playCurrent();
-  }
-
-  // Play current music
-  Future<void> _playCurrent() async {
-    if (_playlist.isEmpty) return;
-
-    final music = _playlist[_currentIndex];
+  // Initialize the player
+  Future<void> _initializePlayer() async {
     try {
-      await _player.setFilePath(music.filePath);
-      await _player.play();
-      // Update current music notifier
-      _currentMusicNotifier.value = music;
+      _player = FlutterSoundPlayer();
+      await _player!.openPlayer();
+      print('Flutter Sound player initialized successfully');
     } catch (e) {
-      print('Error playing audio: $e');
-      // Just Audio might throw exceptions for unsupported formats
-      // We'll keep the current music notifier updated but don't play
-      _currentMusicNotifier.value = music;
-      rethrow;
+      print('Error initializing Flutter Sound player: $e');
     }
   }
 
-  // Play
+  // Play audio file
   Future<void> play() async {
-    if (_player.playing) return;
-    await _player.play();
+    if (_player == null) {
+      await _initializePlayer();
+    }
+
+    if (_playlist.isEmpty) return;
+    
+    final currentMusic = _playlist[_currentIndex];
+    final inputPath = currentMusic.filePath;
+
+    try {
+      // Stop any current playback
+      await stop();
+
+      // Check if file exists
+      if (!File(inputPath).existsSync()) {
+        print('Audio file not found: $inputPath');
+        return;
+      }
+
+      // Get media information for duration
+      final mediaInfo = await FFprobeKit.getMediaInformation(inputPath);
+      final information = mediaInfo.getMediaInformation();
+      if (information != null) {
+        final durationStr = information.getDuration();
+        if (durationStr != null) {
+          _totalDuration = Duration(milliseconds: (double.parse(durationStr) * 1000).round());
+          _durationNotifier.value = _totalDuration;
+        }
+      }
+
+      // Start playback with Flutter Sound
+      await _player!.startPlayer(
+        fromURI: inputPath,
+        codec: Codec.defaultCodec,
+        whenFinished: () {
+          print('Playback completed for: ${currentMusic.title}');
+          _isPlaying = false;
+          _isPaused = false;
+          _isPlayingNotifier.value = false;
+          _stopPositionTimer();
+          
+          // Auto-play next track if available
+          if (_playlist.isNotEmpty && _currentIndex < _playlist.length - 1) {
+            next();
+          }
+        },
+      );
+
+      // Update state
+      _isPlaying = true;
+      _isPaused = false;
+      _isPlayingNotifier.value = true;
+      _currentPosition = Duration.zero;
+      _positionNotifier.value = _currentPosition;
+      
+      // Start position timer
+      _startPositionTimer();
+      
+      print('Started playing: ${currentMusic.title}');
+      
+    } catch (e) {
+      print('Error playing audio: $e');
+      _isPlaying = false;
+      _isPaused = false;
+      _isPlayingNotifier.value = false;
+    }
   }
 
-  // Pause
+  // Pause playback
   Future<void> pause() async {
-    await _player.pause();
+    if (_player == null || !_isPlaying || _isPaused) return;
+
+    try {
+      await _player!.pausePlayer();
+      _isPaused = true;
+      _isPlayingNotifier.value = false;
+      _stopPositionTimer();
+      print('Paused playback');
+    } catch (e) {
+      print('Error pausing audio: $e');
+    }
+  }
+
+  // Resume playback
+  Future<void> resume() async {
+    if (_player == null || !_isPlaying || !_isPaused) return;
+
+    try {
+      await _player!.resumePlayer();
+      _isPaused = false;
+      _isPlayingNotifier.value = true;
+      _startPositionTimer();
+      print('Resumed playback');
+    } catch (e) {
+      print('Error resuming audio: $e');
+    }
   }
 
   // Toggle play/pause
   Future<void> togglePlayPause() async {
-    if (_player.playing) {
+    if (_isPlaying && !_isPaused) {
       await pause();
+    } else if (_isPlaying && _isPaused) {
+      await resume();
     } else {
       await play();
     }
   }
 
-  // Next track
-  Future<void> next() async {
-    if (_playlist.isEmpty) return;
+  // Stop playback
+  Future<void> stop() async {
+    if (_player == null) return;
 
-    _currentIndex = (_currentIndex + 1) % _playlist.length;
-    await _playCurrent();
-  }
-
-  // Previous track
-  Future<void> previous() async {
-    if (_playlist.isEmpty) return;
-
-    if (_player.position.inSeconds > 3) {
-      // If played more than 3 seconds, restart current track
-      await _player.seek(Duration.zero);
-    } else {
-      // Otherwise, go to previous track
-      _currentIndex = (_currentIndex - 1 + _playlist.length) % _playlist.length;
-      await _playCurrent();
+    try {
+      if (_player!.isPlaying) {
+        await _player!.stopPlayer();
+      }
+      _isPlaying = false;
+      _isPaused = false;
+      _isPlayingNotifier.value = false;
+      _stopPositionTimer();
+      _currentPosition = Duration.zero;
+      _positionNotifier.value = _currentPosition;
+      print('Stopped playback');
+    } catch (e) {
+      print('Error stopping audio: $e');
     }
   }
 
   // Seek to position
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
+    if (_player == null || !_isPlaying) return;
+
+    try {
+      await _player!.seekToPlayer(position);
+      _currentPosition = position;
+      _positionNotifier.value = _currentPosition;
+      print('Seeked to: $position');
+    } catch (e) {
+      print('Error seeking audio: $e');
+    }
   }
 
-  // Set volume
-  Future<void> setVolume(double volume) async {
-    await _player.setVolume(volume);
+  // Set playlist and play from index
+  Future<void> setPlaylist(List<Music> playlist, {int startIndex = 0}) async {
+    _playlist = List.from(playlist);
+    _currentIndex = startIndex.clamp(0, _playlist.length - 1);
+    _currentMusicNotifier.value = _playlist.isNotEmpty ? _playlist[_currentIndex] : null;
+    
+    if (_playlist.isNotEmpty) {
+      await play();
+    }
   }
 
-  // Get current position stream
-  Stream<Duration> get positionStream => _player.positionStream;
+  // Play next track
+  Future<void> next() async {
+    if (_playlist.isEmpty) return;
+    
+    _currentIndex = (_currentIndex + 1) % _playlist.length;
+    _currentMusicNotifier.value = _playlist[_currentIndex];
+    await play();
+  }
 
-  // Get duration stream
-  Stream<Duration?> get durationStream => _player.durationStream;
+  // Play previous track
+  Future<void> previous() async {
+    if (_playlist.isEmpty) return;
+    
+    _currentIndex = (_currentIndex - 1 + _playlist.length) % _playlist.length;
+    _currentMusicNotifier.value = _playlist[_currentIndex];
+    await play();
+  }
 
-  // Get player state stream
-  Stream<PlayerState> get playerStateStream => _player.playerStateStream;
+  // Add track to playlist
+  void addToPlaylist(Music music) {
+    _playlist.add(music);
+    if (_playlist.length == 1 && !_isPlaying) {
+      _currentMusicNotifier.value = music;
+      play();
+    }
+  }
 
-  // Dispose player
+  // Remove track from playlist
+  void removeFromPlaylist(Music music) {
+    final index = _playlist.indexOf(music);
+    if (index != -1) {
+      _playlist.removeAt(index);
+      if (_currentIndex >= index && _currentIndex > 0) {
+        _currentIndex--;
+      }
+      if (_currentIndex < _playlist.length) {
+        _currentMusicNotifier.value = _playlist.isNotEmpty ? _playlist[_currentIndex] : null;
+      } else if (_playlist.isNotEmpty) {
+        _currentIndex = 0;
+        _currentMusicNotifier.value = _playlist[0];
+      } else {
+        _currentMusicNotifier.value = null;
+        stop();
+      }
+    }
+  }
+
+  // Start position timer
+  void _startPositionTimer() {
+    _stopPositionTimer();
+    _positionTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
+      if (_player != null && _isPlaying && !_isPaused) {
+        try {
+          // Flutter Sound doesn't provide real-time position updates during playback
+          // We'll estimate position based on elapsed time since last update
+          _currentPosition = _currentPosition + const Duration(milliseconds: 100);
+          if (_currentPosition > _totalDuration) {
+            _currentPosition = _totalDuration;
+          }
+          _positionNotifier.value = _currentPosition;
+        } catch (e) {
+          print('Error updating position: $e');
+        }
+      }
+    });
+  }
+
+  // Stop position timer
+  void _stopPositionTimer() {
+    _positionTimer?.cancel();
+    _positionTimer = null;
+  }
+
+  // Dispose resources
   Future<void> dispose() async {
-    await _player.dispose();
+    _stopPositionTimer();
+    if (_player != null) {
+      await _player!.stopPlayer();
+      await _player!.closePlayer();
+      _player = null;
+    }
+    _currentMusicNotifier.dispose();
+    _positionNotifier.dispose();
+    _durationNotifier.dispose();
+    _isPlayingNotifier.dispose();
   }
 }

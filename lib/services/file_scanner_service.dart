@@ -1,6 +1,7 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:path/path.dart' as path;
-import 'package:just_audio/just_audio.dart';
+import 'package:ffmpeg_kit_flutter_new_audio/ffprobe_kit.dart';
 import '../models/music.dart';
 
 class FileScannerService {
@@ -9,7 +10,7 @@ class FileScannerService {
 
   FileScannerService._internal();
 
-  // Supported audio formats
+  // Supported audio formats - expanded with ffmpeg-kit support
   final List<String> _supportedFormats = [
     '.wav',
     '.flac',
@@ -21,8 +22,18 @@ class FileScannerService {
     '.opus',
     '.wma',
     '.ape',
-    '.dsf',
-    '.dff'
+    '.dsf',  // DSD format
+    '.dff',  // DSD format
+    '.alac', // Apple Lossless
+    '.wv',   // WavPack
+    '.tak',  // TAK format
+    '.tta',  // True Audio
+    '.aac',
+    '.mp4',
+    '.m4v',
+    '.3gp',
+    '.3g2',
+    '.mj2'
   ];
 
   // Scan directory for music files
@@ -61,8 +72,7 @@ class FileScannerService {
     final fileName = path.basenameWithoutExtension(file.path);
     final directory = file.parent;
 
-    // Extract metadata (simplified for now)
-    // In a real app, use audio_metadata package to extract proper metadata
+    // Extract metadata using FFmpeg-kit
     final metadata = await _extractMetadata(file);
 
     // Look for cover image in the same directory
@@ -81,41 +91,94 @@ class FileScannerService {
     );
   }
 
-  // Extract metadata from audio file
+  // Extract metadata from audio file using FFmpeg-kit
   Future<Map<String, dynamic>> _extractMetadata(File file) async {
     try {
-      final audioPlayer = AudioPlayer();
-      await audioPlayer.setFilePath(file.path);
+      final mediaInfo = await FFprobeKit.getMediaInformation(file.path);
+      final information = mediaInfo.getMediaInformation();
+      
+      if (information == null) {
+        return _getDefaultMetadata(file);
+      }
 
-      // Get duration from just_audio
-      final duration = audioPlayer.duration;
+      // Extract duration
+      final durationStr = information.getDuration();
+      int duration = 0;
+      if (durationStr != null) {
+        duration = (double.parse(durationStr) * 1000).round();
+      }
 
-      // For now, just use the filename as title
-      // In a real app, you might want to use a different approach
-      // to extract more metadata
-      final fileName = path.basenameWithoutExtension(file.path);
+      // Extract metadata from streams and format
+      final streams = information.getStreams();
+      final format = information.getFormat();
+      
+      String title = path.basenameWithoutExtension(file.path);
+      String artist = 'Unknown Artist';
+      String album = 'Unknown Album';
+      String genre = '';
+      int year = 0;
 
-      await audioPlayer.dispose();
+      // Try to extract metadata from format tags
+      if (format != null) {
+        final tags = information.getAllProperties();
+        if (tags != null) {
+          title = tags['title'] ?? title;
+          artist = tags['artist'] ?? tags['ARTIST'] ?? artist;
+          album = tags['album'] ?? tags['ALBUM'] ?? album;
+          genre = tags['genre'] ?? tags['GENRE'] ?? genre;
+          
+          // Extract year
+          final date = tags['date'] ?? tags['DATE'] ?? tags['year'] ?? tags['YEAR'];
+          if (date != null) {
+            try {
+              year = int.parse(date.toString().substring(0, 4));
+            } catch (e) {
+              // Ignore parsing errors
+            }
+          }
+        }
+      }
+
+      // Try to extract from audio stream metadata if format didn't have it
+      if (streams.isNotEmpty) {
+        for (final stream in streams) {
+          if (stream.getType() == 'audio') {
+            final streamTags = stream.getTags();
+            if (streamTags != null) {
+              title = streamTags['title'] ?? title;
+              artist = streamTags['artist'] ?? streamTags['ARTIST'] ?? artist;
+              album = streamTags['album'] ?? streamTags['ALBUM'] ?? album;
+              genre = streamTags['genre'] ?? streamTags['GENRE'] ?? genre;
+            }
+            break; // Use first audio stream
+          }
+        }
+      }
 
       return {
-        'title': fileName,
-        'artist': 'Unknown Artist',
-        'album': 'Unknown Album',
-        'duration': duration?.inSeconds ?? 0,
-        'genre': '',
-        'year': 0,
+        'title': title,
+        'artist': artist,
+        'album': album,
+        'duration': duration,
+        'genre': genre,
+        'year': year,
       };
     } catch (e) {
-      // If metadata extraction fails, return default values
-      return {
-        'title': path.basenameWithoutExtension(file.path),
-        'artist': 'Unknown Artist',
-        'album': 'Unknown Album',
-        'duration': 0,
-        'genre': '',
-        'year': 0,
-      };
+      print('Error extracting metadata with FFmpeg-kit: $e');
+      return _getDefaultMetadata(file);
     }
+  }
+
+  // Get default metadata when extraction fails
+  Map<String, dynamic> _getDefaultMetadata(File file) {
+    return {
+      'title': path.basenameWithoutExtension(file.path),
+      'artist': 'Unknown Artist',
+      'album': 'Unknown Album',
+      'duration': 0,
+      'genre': '',
+      'year': 0,
+    };
   }
 
   // Find cover image in directory
