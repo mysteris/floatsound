@@ -12,6 +12,9 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.INTERNET" />
     
+    <!-- Equalizer permission -->
+    <uses-permission android:name="android.permission.ACCESS_AUDIO_EQUALIZER" />
+    
     <application
         android:label="流韵"
         android:name="${applicationName}"

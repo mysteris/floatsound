@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/audio_player_service.dart';
 import '../screens/player_screen.dart';
+import '../screens/category_screen.dart';
+import '../models/app_state.dart';
 
 class BottomPlayerWidget extends StatelessWidget {
   const BottomPlayerWidget({super.key});
@@ -107,7 +110,18 @@ class BottomPlayerWidget extends StatelessWidget {
 
               // Playlist button
               IconButton(
-                onPressed: () {},
+                onPressed: () {
+                  // Get current category from AppState
+                  final appState = Provider.of<AppState>(context, listen: false);
+                  
+                  // Navigate to category screen with current category
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CategoryScreen(),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.playlist_play, color: Colors.white),
               ),
             ],

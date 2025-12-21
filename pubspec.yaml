@@ -36,7 +36,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   
-  # Audio playback - flutter_sound for proper audio playback with format support
+   # Audio playback - flutter_sound for proper audio playback with format support
   flutter_sound: ^9.4.10
   flutter_sound_platform_interface: ^9.4.10
   # FFmpeg for format conversion and metadata
@@ -62,6 +62,19 @@ dependencies:
   
   # Data persistence
   shared_preferences: ^2.2.3
+  
+  # Volume control
+  volume_controller: ^2.0.7
+  
+  # Sticky headers for alphabetical list
+  flutter_sticky_header: ^0.6.5
+  
+  # Pinyin conversion for Chinese character sorting
+  pinyin: ^3.2.0
+  flutter_launcher_icons: ^0.14.4
+  
+  # Equalizer support - removed due to namespace build issues
+  # equalizer_flutter_custom: ^0.0.3
 
 dependency_overrides:
   flutter_plugin_android_lifecycle: 2.0.22
