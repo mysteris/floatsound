@@ -1,48 +1,76 @@
 import 'package:flutter/material.dart';
 import 'lib/services/audio_player_service.dart';
+import 'lib/services/equalizer_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  print('🧪 Testing Equalizer Functionality');
-  print('=====================================');
-
+  
+  print('🎵 Starting Equalizer Test...');
+  
+  // Test 1: Test EqualizerService directly
+  print('\n=== Test 1: EqualizerService Direct Test ===');
+  final equalizerService = EqualizerService();
+  
   try {
-    // Test 1: Create AudioPlayerService instance
-    print('\n📋 Test 1: Creating AudioPlayerService instance...');
-    final audioPlayerService = AudioPlayerService();
-    print('✅ AudioPlayerService created successfully');
-
-    // Test 2: Get equalizer state without initialization
-    print('\n📋 Test 2: Getting equalizer state (should auto-initialize)...');
-    final equalizerState = await audioPlayerService.getEqualizerState();
-    if (equalizerState != null) {
-      print('✅ Equalizer state retrieved successfully');
-      print('   State: $equalizerState');
-    } else {
-      print('❌ Failed to retrieve equalizer state');
+    // Initialize with session ID 0 (global)
+    print('Initializing EqualizerService...');
+    final initResult = await equalizerService.initialize(0);
+    print('✓ EqualizerService initialization result: $initResult');
+    
+    if (initResult) {
+      // Get current state
+      final state = await equalizerService.getEqualizerState();
+      print('📊 Equalizer state: $state');
+      
+      // Test setting band levels
+      print('\n🎚️ Testing band level setting...');
+      final testLevels = [500, 200, -100, -200, -300]; // Millibels
+      final setResult = await equalizerService.setBandLevels(testLevels);
+      print('✓ Band levels set result: $setResult');
+      
+      // Verify the levels were applied
+      final newLevels = await equalizerService.getBandLevels();
+      print('📊 New band levels: $newLevels');
+      
+      // Test enabling/disabling
+      print('\n🔧 Testing enable/disable...');
+      final disableResult = await equalizerService.setEnabled(false);
+      print('✓ Disable result: $disableResult');
+      
+      final enableResult = await equalizerService.setEnabled(true);
+      print('✓ Enable result: $enableResult');
+      
+      // Final state check
+      final finalState = await equalizerService.getEqualizerState();
+      print('📊 Final equalizer state: $finalState');
     }
-
-    // Test 3: Set equalizer preset
-    print('\n📋 Test 3: Setting equalizer preset to "摇滚"...');
-    await audioPlayerService.setEqualizerPreset('摇滚');
-    print('✅ Equalizer preset set successfully');
-
-    // Test 4: Set custom equalizer bands
-    print('\n📋 Test 4: Setting custom equalizer bands...');
-    await audioPlayerService.setEqualizerBands([300, 200, 100, -100, -200]);
-    print('✅ Custom equalizer bands set successfully');
-
-    // Test 5: Get current equalizer settings
-    print('\n📋 Test 5: Getting current equalizer settings...');
-    final currentState = await audioPlayerService.getEqualizerState();
-    print('✅ Current equalizer state retrieved');
-    print('   State: $currentState');
-
-    print('\n🎉 All tests completed successfully!');
-  } catch (e, stackTrace) {
-    print('\n❌ Test failed with error:');
-    print('   Error: $e');
-    print('   Stack trace: $stackTrace');
+  } catch (e) {
+    print('❌ EqualizerService test failed: $e');
   }
+  
+  // Test 2: Test via AudioPlayerService
+  print('\n=== Test 2: AudioPlayerService Integration Test ===');
+  final audioPlayerService = AudioPlayerService();
+  
+  try {
+    // Test equalizer diagnostics
+    print('Getting equalizer diagnostics...');
+    final diagnostics = await audioPlayerService.getEqualizerDiagnostics();
+    print('📊 Equalizer diagnostics: $diagnostics');
+    
+    // Test setting equalizer bands
+    print('\n🎚️ Testing equalizer bands via AudioPlayerService...');
+    final testBands = [2.0, 1.0, 0.0, -1.0, -2.0]; // dB values
+    await audioPlayerService.setEqualizerBands(testBands);
+    print('✓ Equalizer bands set via AudioPlayerService');
+    
+    // Test equalizer state
+    final state = await audioPlayerService.getEqualizerState();
+    print('📊 Equalizer state via AudioPlayerService: $state');
+    
+  } catch (e) {
+    print('❌ AudioPlayerService test failed: $e');
+  }
+  
+  print('\n🎉 Equalizer test completed!');
 }

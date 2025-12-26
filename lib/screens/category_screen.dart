@@ -63,6 +63,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
       List<Music> musicList, int index) async {
     try {
       await audioPlayerService.setPlaylist(musicList, startIndex: index);
+      // Automatically start playing the selected song
+      await audioPlayerService.play();
       if (context.mounted) {
         Navigator.push(
           context,

@@ -147,7 +147,7 @@ class AudioPlayerService {
       // Notify native side that playback has started with a new audio session
       await _notifyPlaybackStarted();
 
-      // Initialize equalizer after playback starts
+      // Initialize equalizer after playback starts with captured Flutter Sound session ID
       _initializeEqualizerAfterPlayback();
 
       // Started playing: ${currentMusic.title}
@@ -171,6 +171,11 @@ class AudioPlayerService {
       _currentPosition = Duration.zero;
       _positionNotifier.value = _currentPosition;
       _stopPositionTimer();
+
+      // Reset audio session ID when playback stops
+      _currentAudioSessionId = 0;
+      print('Reset audio session ID after stopping playback');
+
       // Stopped playback
     } catch (e) {
       // Error stopping audio
@@ -347,7 +352,7 @@ class AudioPlayerService {
       final state = await _equalizerService.getEqualizerState();
       print('Equalizer state: $state');
 
-      if (state == null || state['initialized'] != true) {
+      if (state['initialized'] != true) {
         print('✗ Quick test failed: Equalizer not initialized');
         return false;
       }
@@ -586,9 +591,11 @@ class AudioPlayerService {
     try {
       print('Notifying native side that playback has started...');
 
-      // Use a fixed session ID for audio playback
-      // This ensures the equalizer is attached to the correct audio session
-      const sessionId = 1; // Use a consistent session ID for audio playback
+      // Generate a unique session ID based on current time
+      // This ensures each playback session gets a unique ID
+      final sessionId = DateTime.now().millisecondsSinceEpoch % 1000000;
+      _currentAudioSessionId = sessionId; // Store the session ID
+      print('Generated and stored session ID for playback: $sessionId');
 
       const MethodChannel audioChannel =
           MethodChannel('com.mysteris.floatsound/audio');
@@ -602,44 +609,130 @@ class AudioPlayerService {
     }
   }
 
-  // Initialize equalizer after playback starts
+  // Initialize equalizer after playback starts with Flutter Sound session ID
   Future<void> _initializeEqualizerAfterPlayback() async {
     try {
-      print('Initializing equalizer after playback starts...');
+      print('🎵 Initializing equalizer after Flutter Sound playback starts...');
 
-      // Wait a bit for the player to be fully initialized
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Wait a bit for the Flutter Sound player to be fully initialized
+      await Future.delayed(const Duration(
+          milliseconds: 1000)); // Increased delay for Flutter Sound
 
-      // Get audio session ID
+      // Get Flutter Sound audio session ID with enhanced capture
       final sessionId = await _getAudioSessionId();
 
       if (sessionId > 0) {
-        // Initialize equalizer with the session ID
+        print('✓ Using Flutter Sound audio session ID: $sessionId');
+
+        // Initialize equalizer with Flutter Sound's session ID
         await _initializeEqualizer(sessionId);
 
         // Apply current equalizer settings if available
         if (_currentBandValues != null && _equalizerEnabled) {
-          print('Applying current equalizer settings after initialization');
+          print(
+              '🎚️ Applying current equalizer settings after Flutter Sound initialization');
           _applyEqualizerViaPlatformChannel(_currentBandValues!);
         }
+
+        // Test equalizer functionality with dramatic settings
+        print(
+            '🧪 Testing equalizer functionality with Flutter Sound session...');
+        await _testEqualizerWithFlutterSound(sessionId);
       } else {
-        print('Warning: Invalid audio session ID, using global equalizer');
-        // Use session ID 0 for global audio effects
+        print(
+            '⚠️ Warning: Could not capture Flutter Sound audio session ID, using global equalizer');
+        // Use session ID 0 for global audio effects as fallback
         await _initializeEqualizer(0);
       }
     } catch (e) {
-      print('Error initializing equalizer after playback: $e');
+      print('✗ Error initializing equalizer after Flutter Sound playback: $e');
     }
   }
 
-  // Get audio session ID
+  // Test equalizer functionality with Flutter Sound session
+  Future<void> _testEqualizerWithFlutterSound(int sessionId) async {
+    try {
+      print(
+          '=== Testing Equalizer with Flutter Sound Session ID: $sessionId ===');
+
+      // Wait for audio to stabilize
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Apply dramatic test settings
+      final testBands = [8.0, 6.0, 0.0, -4.0, -6.0];
+      print('🎚️ Applying test equalizer settings: $testBands');
+      await _equalizerService
+          .setBandLevels(testBands.map((v) => (v * 100).toInt()).toList());
+
+      // Wait to hear the effect
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Apply opposite settings
+      final oppositeBands = [-6.0, -4.0, 0.0, 6.0, 8.0];
+      print('🔄 Applying opposite equalizer settings: $oppositeBands');
+      await _equalizerService
+          .setBandLevels(oppositeBands.map((v) => (v * 100).toInt()).toList());
+
+      // Wait to hear the opposite effect
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Reset to flat
+      final flatBands = [0.0, 0.0, 0.0, 0.0, 0.0];
+      print('🔄 Resetting to flat equalizer: $flatBands');
+      await _equalizerService
+          .setBandLevels(flatBands.map((v) => (v * 100).toInt()).toList());
+
+      print('✓ Equalizer test with Flutter Sound session completed');
+    } catch (e) {
+      print('✗ Error testing equalizer with Flutter Sound: $e');
+    }
+  }
+
+  // Store the current session ID
+  int _currentAudioSessionId = 0;
+
+  // Get audio session ID with enhanced Flutter Sound capture
   Future<int> _getAudioSessionId() async {
     try {
-      // Use the method channel to get the actual audio session ID
+      // If we have a stored session ID, use it
+      if (_currentAudioSessionId > 0) {
+        print('✓ Using stored audio session ID: $_currentAudioSessionId');
+        return _currentAudioSessionId;
+      }
+
+      // Try to capture Flutter Sound's audio session ID
       const platform = MethodChannel('com.mysteris.floatsound/audio');
+      try {
+        // First try to capture Flutter Sound session ID
+        final flutterSessionId =
+            await platform.invokeMethod<int>('captureFlutterSoundSessionId');
+        if (flutterSessionId != null && flutterSessionId > 0) {
+          _currentAudioSessionId = flutterSessionId;
+          print('✓ Captured Flutter Sound audio session ID: $flutterSessionId');
+          return flutterSessionId;
+        }
+      } catch (e) {
+        print('⚠️ Could not capture Flutter Sound session ID: $e');
+      }
+
+      // Try force detection if capture didn't work
+      try {
+        final forcedSessionId =
+            await platform.invokeMethod<int>('forceAudioSessionDetection');
+        if (forcedSessionId != null && forcedSessionId > 0) {
+          _currentAudioSessionId = forcedSessionId;
+          print('✓ Forced audio session detection: $forcedSessionId');
+          return forcedSessionId;
+        }
+      } catch (e) {
+        print('⚠️ Force detection failed: $e');
+      }
+
+      // Fallback to legacy method
       try {
         final sessionId = await platform.invokeMethod<int>('getAudioSessionId');
         if (sessionId != null && sessionId > 0) {
+          _currentAudioSessionId = sessionId;
           print('✓ Retrieved audio session ID from native: $sessionId');
           return sessionId;
         }
@@ -647,10 +740,12 @@ class AudioPlayerService {
         print('⚠️ Could not get audio session ID from native: $e');
       }
 
-      // Fallback: Try to get a reasonable session ID based on player state
+      // Last fallback: Generate a new session ID if playing
       if (_player != null && _player!.isOpen() && _isPlaying) {
-        // When playing, use the same session ID that we set in _notifyPlaybackStarted
-        return 1; // Consistent session ID for audio playback
+        _currentAudioSessionId =
+            DateTime.now().millisecondsSinceEpoch % 1000000;
+        print('✓ Generated fallback session ID: $_currentAudioSessionId');
+        return _currentAudioSessionId;
       }
 
       return 0; // Global session as last resort

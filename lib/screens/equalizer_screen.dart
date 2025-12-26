@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audio_player_service.dart';
+import '../models/app_state.dart';
 
 class EqualizerScreen extends StatefulWidget {
   const EqualizerScreen({super.key});
@@ -50,8 +51,6 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   void _applyPreset(String preset) {
     final audioPlayerService = AudioPlayerService();
 
-    print('Applying preset: $preset');
-
     setState(() {
       _selectedPreset = preset;
       if (_presetValues.containsKey(preset)) {
@@ -64,20 +63,10 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     // Apply to audio player service
     audioPlayerService.setEqualizerPreset(preset, _bandValues);
     _applyEqualizerSettings();
-
-    // Show feedback that preset was applied
-    print('Preset "$preset" applied successfully');
   }
 
   void _applyEqualizerSettings() {
     final audioPlayerService = AudioPlayerService();
-
-    print('Applying equalizer settings:');
-    print('Enabled: $_isEnabled');
-    print('Preset: $_selectedPreset');
-    for (int i = 0; i < _frequencies.length; i++) {
-      print('${_frequencies[i]}Hz: ${_bandValues[i]}dB');
-    }
 
     // Apply settings to audio player
     audioPlayerService.setEqualizerEnabled(_isEnabled);
@@ -182,7 +171,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
               '加载自定义预设',
               style: TextStyle(color: Colors.white),
             ),
-            content: Container(
+            content: SizedBox(
               width: double.maxFinite,
               height: 300,
               child: ListView.builder(
@@ -281,179 +270,6 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
           ),
         ),
         actions: [
-          // Test equalizer state button
-          IconButton(
-            icon: const Icon(Icons.bug_report, color: Colors.white),
-            onPressed: () async {
-              final audioPlayerService = AudioPlayerService();
-              final state = await audioPlayerService.getEqualizerState();
-              if (context.mounted) {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('均衡器状态'),
-                    content: Text(state != null ? '状态: $state' : '无法获取均衡器状态'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('确定'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            },
-          ),
-          // Test equalizer functionality button
-          IconButton(
-            icon: const Icon(Icons.science, color: Colors.white),
-            onPressed: () async {
-              final audioPlayerService = AudioPlayerService();
-              final results = await audioPlayerService.testEqualizer();
-              if (context.mounted) {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('均衡器测试'),
-                    content: SingleChildScrollView(
-                      child: Text('测试结果:\n${results.toString()}'),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('确定'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            },
-          ),
-          // Quick diagnostic button
-          IconButton(
-            icon: const Icon(Icons.medical_services, color: Colors.white),
-            onPressed: () async {
-              final audioPlayerService = AudioPlayerService();
-              final diagnostics =
-                  await audioPlayerService.getEqualizerDiagnostics();
-              if (context.mounted) {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('均衡器诊断'),
-                    content: SingleChildScrollView(
-                      child: Text('诊断结果:\n${diagnostics.toString()}'),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('确定'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            },
-          ),
-          // Comprehensive diagnostic button with service status
-          IconButton(
-            icon: const Icon(Icons.analytics, color: Colors.white),
-            onPressed: () async {
-              final audioPlayerService = AudioPlayerService();
-              final comprehensiveDiagnostics =
-                  await audioPlayerService.getComprehensiveDiagnostics();
-              if (context.mounted) {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('综合诊断'),
-                    content: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Summary section
-                          if (comprehensiveDiagnostics['summary'] != null) ...[
-                            const Text('📊 诊断摘要:', style: TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            Text('状态: ${comprehensiveDiagnostics['summary']['overallStatus']}'),
-                            Text('服务可用: ${comprehensiveDiagnostics['summary']['serviceAvailable']}'),
-                            Text('均衡器初始化: ${comprehensiveDiagnostics['summary']['equalizerInitialized']}'),
-                            if (comprehensiveDiagnostics['summary']['hasErrors'] == true)
-                              Text('错误数量: ${comprehensiveDiagnostics['errors']?.length ?? 0}'),
-                            const SizedBox(height: 16),
-                            Text('建议: ${comprehensiveDiagnostics['summary']['recommendation']}'),
-                            const SizedBox(height: 16),
-                          ],
-                          // Service status section
-                          if (comprehensiveDiagnostics['serviceStatus'] != null) ...[
-                            const Text('🔧 服务状态:', style: TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            Text('可用性: ${comprehensiveDiagnostics['serviceStatus']['available']}'),
-                            if (comprehensiveDiagnostics['serviceStatus']['initialized'] != null)
-                              Text('初始化: ${comprehensiveDiagnostics['serviceStatus']['initialized']}'),
-                            if (comprehensiveDiagnostics['serviceStatus']['sessionId'] != null)
-                              Text('会话ID: ${comprehensiveDiagnostics['serviceStatus']['sessionId']}'),
-                            if (comprehensiveDiagnostics['serviceStatus']['error'] != null)
-                              Text('错误: ${comprehensiveDiagnostics['serviceStatus']['error']}', style: const TextStyle(color: Colors.red)),
-                            const SizedBox(height: 16),
-                          ],
-                          // Equalizer state section
-                          if (comprehensiveDiagnostics['equalizerState'] != null) ...[
-                            const Text('🎵 均衡器状态:', style: TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            Text('初始化: ${comprehensiveDiagnostics['equalizerState']['initialized']}'),
-                            Text('启用: ${comprehensiveDiagnostics['equalizerState']['enabled']}'),
-                            if (comprehensiveDiagnostics['equalizerState']['numberOfBands'] != null)
-                              Text('频段数量: ${comprehensiveDiagnostics['equalizerState']['numberOfBands']}'),
-                            if (comprehensiveDiagnostics['equalizerState']['error'] != null)
-                              Text('错误: ${comprehensiveDiagnostics['equalizerState']['error']}', style: const TextStyle(color: Colors.red)),
-                            const SizedBox(height: 16),
-                          ],
-                          // Player state section
-                          if (comprehensiveDiagnostics['playerState'] != null) ...[
-                            const Text('🎮 播放器状态:', style: TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            Text('播放状态: ${comprehensiveDiagnostics['playerState']['isPlaying']}'),
-                            Text('当前曲目: ${comprehensiveDiagnostics['playerState']['currentTrack']}'),
-                            Text('音频会话ID: ${comprehensiveDiagnostics['playerState']['audioSessionId']}'),
-                            Text('均衡器启用: ${comprehensiveDiagnostics['playerState']['equalizerEnabled']}'),
-                            const SizedBox(height: 16),
-                          ],
-                          // Connectivity section
-                          if (comprehensiveDiagnostics['connectivity'] != null) ...[
-                            const Text('🔗 连接状态:', style: TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            Text('方法通道响应: ${comprehensiveDiagnostics['connectivity']['methodChannelResponsive']}'),
-                            Text('可通信: ${comprehensiveDiagnostics['connectivity']['canCommunicate']}'),
-                            if (comprehensiveDiagnostics['connectivity']['error'] != null)
-                              Text('错误: ${comprehensiveDiagnostics['connectivity']['error']}', style: const TextStyle(color: Colors.red)),
-                          ],
-                          // Errors section
-                          if (comprehensiveDiagnostics['errors'] != null && comprehensiveDiagnostics['errors'].isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            const Text('❌ 错误详情:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                            const SizedBox(height: 8),
-                            ...comprehensiveDiagnostics['errors'].map((error) => 
-                              Padding(
-                                padding: const EdgeInsets.only(left: 8, bottom: 4),
-                                child: Text('• $error', style: const TextStyle(color: Colors.red, fontSize: 12)),
-                              )
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('确定'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            },
-          ),
           Row(
             children: [
               Text(

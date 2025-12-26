@@ -9,7 +9,7 @@ import 'player_screen.dart';
 
 class ArtistSongsScreen extends StatelessWidget {
   final ArtistGroup artist;
-  
+
   const ArtistSongsScreen({super.key, required this.artist});
 
   // Play music with error handling
@@ -17,9 +17,11 @@ class ArtistSongsScreen extends StatelessWidget {
       List<Music> musicList, int index) async {
     try {
       await audioPlayerService.setPlaylist(musicList, startIndex: index);
+      // Automatically start playing the selected song
+      await audioPlayerService.play();
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => PlayerScreen()),
+        MaterialPageRoute(builder: (context) => const PlayerScreen()),
       );
     } catch (e) {
       print('Playback error: $e');
@@ -57,14 +59,16 @@ class ArtistSongsScreen extends StatelessWidget {
         itemCount: artist.songs.length,
         itemBuilder: (context, index) {
           final music = artist.songs[index] as Music;
-          return _buildMusicListItem(context, music, artist.songs.cast<Music>(), index, audioPlayerService);
+          return _buildMusicListItem(context, music, artist.songs.cast<Music>(),
+              index, audioPlayerService);
         },
       ),
     );
   }
 
   // Build music list item with favorite toggle
-  Widget _buildMusicListItem(BuildContext context, Music music, List<Music> musicList, int index, AudioPlayerService audioPlayerService) {
+  Widget _buildMusicListItem(BuildContext context, Music music,
+      List<Music> musicList, int index, AudioPlayerService audioPlayerService) {
     return Consumer<AppState>(
       builder: (context, appState, child) {
         final isFavorite = appState.isFavorite(music.id);

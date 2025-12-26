@@ -60,7 +60,7 @@ class EqualizerMethodChannel(private val flutterEngine: FlutterEngine) {
                     Log.d("EqualizerMethodChannel", "=== setEqualizerBand called: band=$band, level=$level ===")
                     
                     try {
-                        val success = setEqualizerBand(band, level)
+                        val success = setEqualizerBand(band, level.toShort())
                         result.success(mapOf("success" to success))
                     } catch (e: Exception) {
                         Log.e("EqualizerMethodChannel", "✗ Exception during setEqualizerBand: ${e.message}")
@@ -143,24 +143,16 @@ class EqualizerMethodChannel(private val flutterEngine: FlutterEngine) {
             currentEqualizer = Equalizer(0, sessionId)
             audioSessionId = sessionId
             
-            Log.d("EqualizerMethodChannel", "Equalizer created: $equalizer")
-            Log.d("EqualizerMethodChannel", "Equalizer enabled: ${equalizer.enabled}")
+            Log.d("EqualizerMethodChannel", "Equalizer created: $currentEqualizer")
+            Log.d("EqualizerMethodChannel", "Equalizer enabled: ${currentEqualizer?.enabled}")
             
-            if (equalizer.enabled) {
-                Log.d("EqualizerMethodChannel", "✓ Equalizer is enabled by default")
-            } else {
-                Log.d("EqualizerMethodChannel", "⚠️ Equalizer is not enabled by default, enabling it")
-                equalizer.enabled = true
-                Log.d("EqualizerMethodChannel", "Equalizer enabled after manual enable: ${equalizer.enabled}")
-            }
-            
-            equalizer?.let { eq ->
+            currentEqualizer?.let { eq ->
                 Log.d("EqualizerMethodChannel", "✓ Equalizer created successfully")
                 Log.d("EqualizerMethodChannel", "Equalizer instance: $eq")
                 
                 // Get equalizer properties
                 Log.d("EqualizerMethodChannel", "Getting band level range...")
-                val bandLevelRange = shortArrayOf(eq.bandLevelRange[0], eq.bandLevelRange[1])
+                val bandLevelRange = listOf(eq.bandLevelRange[0].toInt(), eq.bandLevelRange[1].toInt())
                 
                 Log.d("EqualizerMethodChannel", "Getting number of bands...")
                 val numberOfBands = eq.numberOfBands.toInt()
@@ -174,7 +166,7 @@ class EqualizerMethodChannel(private val flutterEngine: FlutterEngine) {
                 // Get center frequencies for all bands
                 for (i in 0 until numberOfBands) {
                     try {
-                        val freq = eq.getCenterFreq(i.toShort())
+                        val freq = eq.getCenterFreq(i.toShort()).toInt()
                         centerFrequencies.add(freq)
                         Log.d("EqualizerMethodChannel", "Band $i center frequency: $freq")
                     } catch (e: Exception) {
@@ -190,22 +182,24 @@ class EqualizerMethodChannel(private val flutterEngine: FlutterEngine) {
                 
                 val result = mapOf(
                     "success" to true,
-                    "bandLevelRange" to bandLevelRange.toList(),
+                    "numberOfBands" to numberOfBands,
+                    "bandLevelRange" to bandLevelRange,
                     "centerFrequencies" to centerFrequencies,
-                    "enabled" to true,
-                    "numberOfBands" to numberOfBands
+                    "enabled" to eq.enabled
                 )
                 
                 Log.d("EqualizerMethodChannel", "✓ Equalizer initialization completed successfully")
                 return result
-                
-            } ?: run {
-                Log.e("EqualizerMethodChannel", "✗ Failed to create equalizer - null instance")
-                return mapOf(
-                    "success" to false,
-                    "error" to "Failed to create equalizer instance"
-                )
             }
+            
+            // Handle null equalizer case
+             Log.e("EqualizerMethodChannel", "✗ Failed to create equalizer - null instance")
+             return mapOf(
+                 "success" to false,
+                 "error" to "Failed to create equalizer instance"
+             )
+            
+
             
         } catch (e: Exception) {
             Log.e("EqualizerMethodChannel", "✗ Exception during equalizer initialization: ${e.message}")

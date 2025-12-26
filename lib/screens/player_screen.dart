@@ -329,7 +329,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                         child: Container(
                           width: 80,
                           height: 80,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: Colors.red,
                             shape: BoxShape.circle,
                           ),

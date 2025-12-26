@@ -30,7 +30,8 @@ class BottomPlayerWidget extends StatelessWidget {
                     // Navigate to player screen
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => PlayerScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => const PlayerScreen()),
                     );
                   },
                   child: Row(
@@ -112,8 +113,9 @@ class BottomPlayerWidget extends StatelessWidget {
               IconButton(
                 onPressed: () {
                   // Get current category from AppState
-                  final appState = Provider.of<AppState>(context, listen: false);
-                  
+                  final appState =
+                      Provider.of<AppState>(context, listen: false);
+
                   // Navigate to category screen with current category
                   Navigator.push(
                     context,

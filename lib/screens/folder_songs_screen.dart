@@ -9,7 +9,7 @@ import 'player_screen.dart';
 
 class FolderSongsScreen extends StatelessWidget {
   final FolderGroup folder;
-  
+
   const FolderSongsScreen({super.key, required this.folder});
 
   // Play music with error handling
@@ -17,9 +17,11 @@ class FolderSongsScreen extends StatelessWidget {
       List<Music> musicList, int index) async {
     try {
       await audioPlayerService.setPlaylist(musicList, startIndex: index);
+      // Automatically start playing the selected song
+      await audioPlayerService.play();
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => PlayerScreen()),
+        MaterialPageRoute(builder: (context) => const PlayerScreen()),
       );
     } catch (e) {
       print('Playback error: $e');
@@ -59,14 +61,16 @@ class FolderSongsScreen extends StatelessWidget {
         itemCount: folder.songs.length,
         itemBuilder: (context, index) {
           final music = folder.songs[index] as Music;
-          return _buildMusicListItem(context, music, folder.songs.cast<Music>(), index, audioPlayerService);
+          return _buildMusicListItem(context, music, folder.songs.cast<Music>(),
+              index, audioPlayerService);
         },
       ),
     );
   }
 
   // Build music list item with favorite toggle
-  Widget _buildMusicListItem(BuildContext context, Music music, List<Music> musicList, int index, AudioPlayerService audioPlayerService) {
+  Widget _buildMusicListItem(BuildContext context, Music music,
+      List<Music> musicList, int index, AudioPlayerService audioPlayerService) {
     return Consumer<AppState>(
       builder: (context, appState, child) {
         final isFavorite = appState.isFavorite(music.id);
@@ -74,7 +78,8 @@ class FolderSongsScreen extends StatelessWidget {
           leading: SizedBox(
             width: 48,
             height: 48,
-            child: music.coverPath != null && File(music.coverPath!).existsSync()
+            child: music.coverPath != null &&
+                    File(music.coverPath!).existsSync()
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: Image.file(
