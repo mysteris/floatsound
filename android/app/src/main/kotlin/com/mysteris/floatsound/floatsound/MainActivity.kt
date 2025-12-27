@@ -221,7 +221,8 @@ class MainActivity: FlutterActivity() {
 
     private fun showSystemVolumeControl() {
         try {
-            // Method 1: Try to show system volume panel
+            // Show system volume panel by adjusting volume with ADJUST_SAME
+            // This will display the volume UI without actually changing the volume
             val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
             audioManager.adjustStreamVolume(
                 AudioManager.STREAM_MUSIC,
@@ -229,31 +230,10 @@ class MainActivity: FlutterActivity() {
                 AudioManager.FLAG_SHOW_UI
             )
             
-            // Method 2: Alternative approach using system settings (fallback)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                try {
-                    val intent = Intent(Settings.ACTION_SOUND_SETTINGS)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    // Fallback to audio manager method
-                    val volumeIntent = Intent("android.settings.SOUND_SETTINGS")
-                    volumeIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    startActivity(volumeIntent)
-                }
-            }
+            println("System volume bar shown successfully")
         } catch (e: Exception) {
-            // Final fallback - just try to trigger any volume-related activity
-            try {
-                val fallbackIntent = Intent("android.intent.action.MAIN")
-                fallbackIntent.setClassName("com.android.settings", "com.android.settings.SoundSettings")
-                fallbackIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(fallbackIntent)
-            } catch (e2: Exception) {
-                // If all else fails, the method channel will still return success
-                // but the volume control might not show
-                e2.printStackTrace()
-            }
+            println("Error showing system volume control: ${e.message}")
+            e.printStackTrace()
         }
     }
 

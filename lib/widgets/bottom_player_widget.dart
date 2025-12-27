@@ -40,7 +40,7 @@ class BottomPlayerWidget extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(left: 10.0),
                         child:
-                            audioPlayerService.currentMusic?.coverPath != null
+                            audioPlayerService.currentMusic?.coverPath != null && File(audioPlayerService.currentMusic!.coverPath!).existsSync()
                                 ? Image.file(
                                     File(audioPlayerService
                                         .currentMusic!.coverPath!),

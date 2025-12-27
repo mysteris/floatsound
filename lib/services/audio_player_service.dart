@@ -1,7 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -9,6 +8,13 @@ import 'package:ffmpeg_kit_flutter_new_audio/ffprobe_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'equalizer_service.dart';
 import '../models/music.dart';
+
+// Play mode enum
+enum PlayMode {
+  sequential,  // 顺序播放
+  repeatOne,   // 单曲循环
+  shuffle,     // 随机播放
+}
 
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
@@ -33,6 +39,7 @@ class AudioPlayerService {
   bool _isPaused = false;
   Duration _currentPosition = Duration.zero;
   Duration _totalDuration = Duration.zero;
+  PlayMode _playMode = PlayMode.sequential;
 
   // Timer for position updates
   Timer? _positionTimer;
@@ -71,6 +78,7 @@ class AudioPlayerService {
   bool get isPaused => _isPaused;
   List<Music> get playlist => List.unmodifiable(_playlist);
   int get currentIndex => _currentIndex;
+  PlayMode get playMode => _playMode;
 
   // Initialize the player
   Future<void> _initializePlayer() async {
@@ -127,9 +135,27 @@ class AudioPlayerService {
           _isPlayingNotifier.value = false;
           _stopPositionTimer();
 
-          // Auto-play next track if available
-          if (_playlist.isNotEmpty && _currentIndex < _playlist.length - 1) {
-            next();
+          // Handle different play modes
+          if (_playMode == PlayMode.repeatOne) {
+            // Repeat current song
+            play();
+          } else if (_playMode == PlayMode.shuffle) {
+            // Play random song
+            if (_playlist.length > 1) {
+              final random = Random();
+              int nextIndex;
+              do {
+                nextIndex = random.nextInt(_playlist.length);
+              } while (nextIndex == _currentIndex && _playlist.length > 1);
+              _currentIndex = nextIndex;
+              _currentMusicNotifier.value = _playlist[_currentIndex];
+              play();
+            }
+          } else {
+            // Sequential play - auto-play next track if available
+            if (_playlist.isNotEmpty && _currentIndex < _playlist.length - 1) {
+              next();
+            }
           }
         },
       );
@@ -227,10 +253,33 @@ class AudioPlayerService {
   Future<void> next() async {
     if (_playlist.isEmpty) return;
 
-    if (_currentIndex < _playlist.length - 1) {
-      _currentIndex++;
-      _currentMusicNotifier.value = _playlist[_currentIndex];
+    if (_playMode == PlayMode.shuffle) {
+      // Shuffle mode: play random song
+      if (_playlist.length > 1) {
+        final random = Random();
+        int nextIndex;
+        do {
+          nextIndex = random.nextInt(_playlist.length);
+        } while (nextIndex == _currentIndex && _playlist.length > 1);
+        _currentIndex = nextIndex;
+        _currentMusicNotifier.value = _playlist[_currentIndex];
+        await play();
+      }
+    } else if (_playMode == PlayMode.repeatOne) {
+      // Repeat one mode: replay current song
       await play();
+    } else {
+      // Sequential mode: play next song in order
+      if (_currentIndex < _playlist.length - 1) {
+        _currentIndex++;
+        _currentMusicNotifier.value = _playlist[_currentIndex];
+        await play();
+      } else {
+        // Loop back to first song when at the end
+        _currentIndex = 0;
+        _currentMusicNotifier.value = _playlist[_currentIndex];
+        await play();
+      }
     }
   }
 
@@ -238,10 +287,33 @@ class AudioPlayerService {
   Future<void> previous() async {
     if (_playlist.isEmpty) return;
 
-    if (_currentIndex > 0) {
-      _currentIndex--;
-      _currentMusicNotifier.value = _playlist[_currentIndex];
+    if (_playMode == PlayMode.shuffle) {
+      // Shuffle mode: play random song
+      if (_playlist.length > 1) {
+        final random = Random();
+        int prevIndex;
+        do {
+          prevIndex = random.nextInt(_playlist.length);
+        } while (prevIndex == _currentIndex && _playlist.length > 1);
+        _currentIndex = prevIndex;
+        _currentMusicNotifier.value = _playlist[_currentIndex];
+        await play();
+      }
+    } else if (_playMode == PlayMode.repeatOne) {
+      // Repeat one mode: replay current song from beginning
       await play();
+    } else {
+      // Sequential mode: play previous song in order
+      if (_currentIndex > 0) {
+        _currentIndex--;
+        _currentMusicNotifier.value = _playlist[_currentIndex];
+        await play();
+      } else {
+        // Loop back to last song when at the beginning
+        _currentIndex = _playlist.length - 1;
+        _currentMusicNotifier.value = _playlist[_currentIndex];
+        await play();
+      }
     }
   }
 
@@ -301,6 +373,7 @@ class AudioPlayerService {
   Future<void> setEqualizerEnabled(bool enabled) async {
     _equalizerEnabled = enabled;
     await _equalizerService.setEnabled(enabled);
+    await saveEqualizerState(); // Save the state after setting
   }
 
   // Get equalizer state
@@ -964,6 +1037,7 @@ class AudioPlayerService {
         await setEqualizerBands(bandValues);
         _currentPreset = presetName;
         print('Equalizer preset set to: $presetName with custom band values');
+        await saveEqualizerState(); // Save the state after setting
         return;
       }
 
@@ -990,6 +1064,7 @@ class AudioPlayerService {
       }
       _currentPreset = presetName;
       print('Equalizer preset set to: $presetName');
+      await saveEqualizerState(); // Save the state after setting
     } catch (e) {
       print('Error setting equalizer preset: $e');
       rethrow;
@@ -1015,6 +1090,7 @@ class AudioPlayerService {
       _currentBandValues = bandValues;
       _currentPreset = '自定义';
       print('Equalizer bands set to: $bandValues');
+      await saveEqualizerState(); // Save the state after setting
     } catch (e) {
       print('Error setting equalizer bands: $e');
       rethrow;
@@ -1022,11 +1098,12 @@ class AudioPlayerService {
   }
 
   // Show system volume control
-  void showSystemVolumeControl() {
-    // Show system volume control
+  Future<void> showSystemVolumeControl() async {
     try {
-      // This would typically use a platform-specific implementation
-      print('Showing system volume control');
+      // Call Android native method to show system volume bar
+      const platform = MethodChannel('com.mysteris.floatsound/volume');
+      await platform.invokeMethod('showVolumeControl');
+      print('System volume control shown');
     } catch (e) {
       print('Error showing system volume control: $e');
     }
@@ -1048,16 +1125,39 @@ class AudioPlayerService {
 
   // Get play mode icon
   IconData getPlayModeIcon() {
-    // Return icon for current play mode
-    // This would typically return an IconData representing the icon
-    return Icons.repeat; // Default implementation
+    switch (_playMode) {
+      case PlayMode.sequential:
+        return Icons.repeat;
+      case PlayMode.repeatOne:
+        return Icons.repeat_one;
+      case PlayMode.shuffle:
+        return Icons.shuffle;
+    }
   }
 
   // Toggle play mode
-  void togglePlayMode() {
-    // Toggle between different play modes
-    // This would typically cycle through repeat, shuffle, etc.
-    print('Toggling play mode');
+  Future<void> togglePlayMode() async {
+    // Cycle through play modes: sequential -> repeat one -> shuffle -> sequential
+    switch (_playMode) {
+      case PlayMode.sequential:
+        _playMode = PlayMode.repeatOne;
+        break;
+      case PlayMode.repeatOne:
+        _playMode = PlayMode.shuffle;
+        break;
+      case PlayMode.shuffle:
+        _playMode = PlayMode.sequential;
+        break;
+    }
+    
+    // Save play mode to preferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('play_mode', _playMode.index);
+      print('Play mode changed to: $_playMode');
+    } catch (e) {
+      print('Error saving play mode: $e');
+    }
   }
 
   // Load player state from storage
@@ -1068,8 +1168,16 @@ class AudioPlayerService {
       final positionMs = prefs.getInt('last_position') ?? 0;
       _currentPosition = Duration(milliseconds: positionMs);
       _positionNotifier.value = _currentPosition;
+      
+      // Load play mode
+      final playModeIndex = prefs.getInt('play_mode') ?? 0;
+      _playMode = PlayMode.values[playModeIndex];
+      
       print(
-          'Player state loaded: index=$_currentIndex, position=${_currentPosition.inSeconds}s');
+          'Player state loaded: index=$_currentIndex, position=${_currentPosition.inSeconds}s, playMode=$_playMode');
+      
+      // Load equalizer state as well
+      await loadEqualizerState();
     } catch (e) {
       print('Error loading player state: $e');
     }
@@ -1086,4 +1194,69 @@ class AudioPlayerService {
       print('Error resuming from saved position: $e');
     }
   }
+
+  // Save equalizer state
+  Future<void> saveEqualizerState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('equalizer_preset', _currentPreset);
+      await prefs.setBool('equalizer_enabled', _equalizerEnabled);
+      if (_currentBandValues != null) {
+        await prefs.setString('equalizer_band_values', _currentBandValues!.join(','));
+      }
+      print('Equalizer state saved: preset=$_currentPreset, enabled=$_equalizerEnabled');
+    } catch (e) {
+      print('Error saving equalizer state: $e');
+    }
+  }
+
+  // Load equalizer state
+  Future<void> loadEqualizerState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _currentPreset = prefs.getString('equalizer_preset') ?? '标准';
+      _equalizerEnabled = prefs.getBool('equalizer_enabled') ?? true;
+      final bandValuesString = prefs.getString('equalizer_band_values');
+      if (bandValuesString != null) {
+        _currentBandValues = bandValuesString
+            .split(',')
+            .map((value) => double.parse(value))
+            .toList();
+      } else {
+        // Load default values for the current preset if no custom bands were saved
+        if (_presetValues.containsKey(_currentPreset)) {
+          _currentBandValues = List.from(_presetValues[_currentPreset]!);
+        } else {
+          _currentBandValues = [0.0, 0.0, 0.0, 0.0, 0.0];
+        }
+      }
+      print('Equalizer state loaded: preset=$_currentPreset, enabled=$_equalizerEnabled, bands=${_currentBandValues?.join(',')}');
+    } catch (e) {
+      print('Error loading equalizer state: $e');
+      // Set defaults on error
+      _currentPreset = '标准';
+      _currentBandValues = [0.0, 0.0, 0.0, 0.0, 0.0];
+      _equalizerEnabled = true;
+    }
+  }
+
+  // Preset values map for default values
+  final Map<String, List<double>> _presetValues = {
+    '标准': [0.0, 0.0, 0.0, 0.0, 0.0],
+    '重低音': [6.0, 4.0, 2.0, -1.0, -2.0],
+    '摇滚': [4.0, 2.0, 3.0, 2.0, 4.0],
+    '爵士': [3.0, 2.0, 1.0, 2.0, 3.0],
+    '流行': [-1.0, 2.0, 4.0, 2.0, -1.0],
+    '古典': [2.0, 1.0, 0.0, 1.0, 2.0],
+    '舞曲': [5.0, 3.0, 1.0, 3.0, 5.0],
+    '嘻哈': [6.0, 3.0, 1.0, 2.0, 4.0],
+    '电子': [4.0, 3.0, 2.0, 3.0, 4.0],
+    '原声': [2.0, 3.0, 2.0, 3.0, 2.0],
+  };
+
+  // Getters for equalizer state
+  // Public getters for accessing private fields
+  String get currentPreset => _currentPreset;
+  bool get equalizerEnabled => _equalizerEnabled;
+  List<double>? get currentBandValues => _currentBandValues;
 }

@@ -119,9 +119,9 @@ class _PlayerScreenState extends State<PlayerScreen>
                                 builder: (context, child) {
                                   return Opacity(
                                     opacity: _fadeAnimation.value,
-                                    child: currentMusic?.coverPath != null
+                                    child: currentMusic?.coverPath != null && File(currentMusic!.coverPath!).existsSync()
                                         ? Image.file(
-                                            File(currentMusic!.coverPath!),
+                                            File(currentMusic.coverPath!),
                                             width: 280,
                                             height: 280,
                                             fit: BoxFit.cover,

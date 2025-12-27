@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:floatsound/services/file_scanner_service.dart';
-import 'package:floatsound/models/music.dart';
 import 'dart:io';
 
 void main() {

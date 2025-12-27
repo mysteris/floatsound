@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audio_player_service.dart';
-import '../models/app_state.dart';
 
 class EqualizerScreen extends StatefulWidget {
   const EqualizerScreen({super.key});
@@ -33,6 +29,32 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   // Frequency bands (Hz)
   final List<double> _frequencies = [60, 230, 910, 3600, 14000];
   final List<double> _bandValues = [0.0, 0.0, 0.0, 0.0, 0.0]; // -10 to +10 dB
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedEqualizerState();
+  }
+
+  // Load saved equalizer state
+  Future<void> _loadSavedEqualizerState() async {
+    // Wait a bit to ensure the service is initialized
+    await Future.delayed(const Duration(milliseconds: 100));
+    final audioPlayerService = AudioPlayerService();
+    await audioPlayerService.loadEqualizerState();
+    
+    // Update UI with saved state
+    setState(() {
+      _selectedPreset = audioPlayerService.currentPreset;
+      _isEnabled = audioPlayerService.equalizerEnabled;
+      final savedBandValues = audioPlayerService.currentBandValues;
+      if (savedBandValues != null) {
+        for (int i = 0; i < _bandValues.length && i < savedBandValues.length; i++) {
+          _bandValues[i] = savedBandValues[i];
+        }
+      }
+    });
+  }
 
   // Preset values
   final Map<String, List<double>> _presetValues = {
